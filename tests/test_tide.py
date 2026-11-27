@@ -102,9 +102,14 @@ def test_coefficients_on() -> None:
 
 
 def test_card_attributes_compact() -> None:
-    attrs = _data().card_attributes()
+    attrs = _data().card_attributes(NOW)
     assert attrs["curve_step"] == 10
-    assert len(attrs["curve"]) == 360
+    # Fenêtre [maintenant - 24 h, maintenant + 48 h] : la fin de la courbe est coupée.
+    assert attrs["curve_start"] == "2026-11-26T22:00:00+00:00"
+    # 26/11 22:00 -> 29/11 09:00 (maintenant + 48 h), plus un point de marge.
+    assert len(attrs["curve"]) == 6 * 59 + 2
+    assert "sea_curve" not in attrs and "locks" not in attrs
+    assert attrs["source"] == "api_maree"
     assert attrs["extrema"][0]["type"] in (HIGH, LOW)
     assert "api-maree.fr" in attrs["data_attribution"]
     assert attrs["sun"][1]["sunrise"].startswith("2026-11-27T")

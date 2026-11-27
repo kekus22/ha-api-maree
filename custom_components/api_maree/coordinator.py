@@ -25,41 +25,91 @@ from .const import (
     CURVE_HOURS_BEFORE,
     CURVE_STEP_MINUTES,
     DOMAIN,
+    EDF_LOCK_DAYS,
+    EDF_UPDATE_INTERVAL,
+    EDF_WEEKS_AHEAD,
     EXTREMA_DAYS_AFTER,
     EXTREMA_DAYS_BEFORE,
     RECOMPUTE_INTERVAL,
+    SOURCE_EDF_RANCE,
     UPDATE_INTERVAL,
 )
-from .tide import TideData, parse_attribution, parse_curve, parse_extrema, parse_sun
+from .edf import (
+    EDF_ATTRIBUTION,
+    EDF_SITE_NAME,
+    EDF_TZ,
+    EdfError,
+    EdfRanceClient,
+    build_lock_periods,
+    monday_of,
+)
+from .tide import (
+    TideData,
+    find_extrema,
+    parse_attribution,
+    parse_curve,
+    parse_extrema,
+    parse_sun,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
-type ApiMareeConfigEntry = ConfigEntry[ApiMareeCoordinator]
+type ApiMareeConfigEntry = ConfigEntry[TideCoordinator]
 
 
-class ApiMareeCoordinator(DataUpdateCoordinator[TideData]):
-    """Récupère les données d'un port toutes les 6 h.
+class TideCoordinator(DataUpdateCoordinator[TideData]):
+    """Base commune : données d'un site, recalculées chaque minute.
 
-    Entre deux appels, les entités sont recalculées chaque minute à partir des
-    données en cache (hauteur actuelle, prochaine marée…), sans requête API.
+    Entre deux appels, les entités sont recalculées à partir des données en
+    cache (hauteur actuelle, prochaine marée…), sans requête réseau.
     """
 
     config_entry: ApiMareeConfigEntry
+    source: str
 
     def __init__(
-        self, hass: HomeAssistant, entry: ApiMareeConfigEntry, client: ApiMareeClient
+        self, hass: HomeAssistant, entry: ApiMareeConfigEntry, interval: timedelta
     ) -> None:
         super().__init__(
             hass,
             _LOGGER,
             config_entry=entry,
             name=f"{DOMAIN}_{entry.data[CONF_SITE_ID]}",
-            update_interval=UPDATE_INTERVAL,
+            update_interval=interval,
         )
-        self.client = client
         self.site_id: str = entry.data[CONF_SITE_ID]
         self.site_name: str = entry.data.get(CONF_SITE_NAME, self.site_id)
         self._unsub_tick: CALLBACK_TYPE | None = None
+
+    @callback
+    def async_start_ticker(self) -> None:
+        """Rafraîchit l'état des entités chaque minute, à partir du cache."""
+
+        @callback
+        def _tick(_: datetime) -> None:
+            if self.data is not None:
+                self.async_update_listeners()
+
+        self._unsub_tick = async_track_time_interval(self.hass, _tick, RECOMPUTE_INTERVAL)
+
+    @callback
+    def async_stop_ticker(self) -> None:
+        """Arrête le recalcul périodique."""
+        if self._unsub_tick:
+            self._unsub_tick()
+            self._unsub_tick = None
+
+
+class ApiMareeCoordinator(TideCoordinator):
+    """Port api-maree.fr : 3 requêtes toutes les 6 h."""
+
+    source = "api_maree"
+
+    def __init__(
+        self, hass: HomeAssistant, entry: ApiMareeConfigEntry, client: ApiMareeClient
+    ) -> None:
+        super().__init__(hass, entry, UPDATE_INTERVAL)
+        self.client = client
 
     async def _async_update_data(self) -> TideData:
         now = datetime.now(UTC).replace(second=0, microsecond=0)
@@ -108,20 +158,54 @@ class ApiMareeCoordinator(DataUpdateCoordinator[TideData]):
             fetched_at=now,
         )
 
-    @callback
-    def async_start_ticker(self) -> None:
-        """Rafraîchit l'état des entités chaque minute, à partir du cache."""
 
-        @callback
-        def _tick(_: datetime) -> None:
-            if self.data is not None:
-                self.async_update_listeners()
+class EdfRanceCoordinator(TideCoordinator):
+    """Estuaire de la Rance (EDF) : niveaux sur 3 semaines et écluse sur 8 jours."""
 
-        self._unsub_tick = async_track_time_interval(self.hass, _tick, RECOMPUTE_INTERVAL)
+    source = SOURCE_EDF_RANCE
 
-    @callback
-    def async_stop_ticker(self) -> None:
-        """Arrête le recalcul périodique."""
-        if self._unsub_tick:
-            self._unsub_tick()
-            self._unsub_tick = None
+    def __init__(
+        self, hass: HomeAssistant, entry: ApiMareeConfigEntry, client: EdfRanceClient
+    ) -> None:
+        super().__init__(hass, entry, EDF_UPDATE_INTERVAL)
+        self.client = client
+        self.site_name = entry.data.get(CONF_SITE_NAME, EDF_SITE_NAME)
+
+    async def _async_update_data(self) -> TideData:
+        now = datetime.now(UTC).replace(second=0, microsecond=0)
+        today = now.astimezone(EDF_TZ).date()
+        first_week = monday_of(today - timedelta(days=1))
+        weeks = sorted(
+            {first_week + timedelta(weeks=i) for i in range(EDF_WEEKS_AHEAD + 1)}
+            | {monday_of(today)}
+        )
+        try:
+            levels = await self.client.async_get_levels(weeks)
+        except EdfError as err:
+            raise UpdateFailed(
+                translation_domain=DOMAIN,
+                translation_key="update_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
+
+        # L'écluse est facultative : en cas d'erreur, on garde les horaires précédents.
+        days = [today + timedelta(days=i) for i in range(-1, EDF_LOCK_DAYS - 1)]
+        try:
+            locks = build_lock_periods(await self.client.async_get_locks(days))
+        except EdfError as err:
+            _LOGGER.warning("Horaires d'éclusage EDF indisponibles : %s", err)
+            locks = self.data.locks if self.data else []
+
+        return TideData(
+            site_id=self.site_id,
+            site_name=self.site_name,
+            extrema=find_extrema(levels.start, levels.step, levels.estuary),
+            curve_start=levels.start,
+            curve_step=levels.step,
+            curve=levels.estuary,
+            sea_curve=levels.sea,
+            locks=locks,
+            attribution=EDF_ATTRIBUTION,
+            fetched_at=now,
+            source=SOURCE_EDF_RANCE,
+        )

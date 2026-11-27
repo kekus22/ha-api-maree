@@ -1,16 +1,6 @@
 {
   "config": {
     "step": {
-      "user": {
-        "title": "API Marée",
-        "description": "Saisissez votre clé api-maree.fr pour accéder à tous les ports. Laissez vide pour utiliser la clé de démonstration publique (9 ports seulement). Compte gratuit : {register_url}.",
-        "data": {
-          "api_key": "Clé API (facultative)"
-        },
-        "data_description": {
-          "api_key": "Disponible sur la page de votre compte api-maree.fr."
-        }
-      },
       "site": {
         "title": "Choix du port",
         "description": "{count} ports disponibles ({mode}).",
@@ -24,13 +14,36 @@
         "data": {
           "api_key": "Clé API"
         }
+      },
+      "user": {
+        "title": "API Marée",
+        "description": "Choisissez la source des données.",
+        "menu_options": {
+          "api_maree": "Port (api-maree.fr)",
+          "edf_rance": "Estuaire de la Rance (EDF, Saint-Suliac)"
+        }
+      },
+      "edf_rance": {
+        "title": "Estuaire de la Rance (EDF)",
+        "description": "Niveaux prévisionnels de l'estuaire et de la mer au marégraphe de Saint-Suliac, et horaires d'éclusage du barrage, publiés par EDF ({page_url}). Aucune clé n'est nécessaire. Précision : ± 30 cm, hors surcote et décote."
+      },
+      "api_maree": {
+        "title": "API Marée",
+        "description": "Saisissez votre clé api-maree.fr pour accéder à tous les ports. Laissez vide pour utiliser la clé de démonstration publique (9 ports seulement). Compte gratuit : {register_url}.",
+        "data": {
+          "api_key": "Clé API (facultative)"
+        },
+        "data_description": {
+          "api_key": "Disponible sur la page de votre compte api-maree.fr."
+        }
       }
     },
     "error": {
       "invalid_auth": "Clé API invalide.",
       "cannot_connect": "Impossible de joindre api-maree.fr.",
       "no_sites": "L'API n'a renvoyé aucun port.",
-      "site_not_allowed": "Cette clé ne donne pas accès à ce port."
+      "site_not_allowed": "Cette clé ne donne pas accès à ce port.",
+      "edf_cannot_connect": "Impossible de lire les prévisions EDF. Le site d'EDF filtre parfois les accès automatisés : vérifiez que Home Assistant peut joindre le site d'EDF."
     },
     "abort": {
       "already_configured": "Ce port est déjà configuré.",
@@ -74,6 +87,12 @@
           },
           "coefficient": {
             "name": "Coefficient"
+          },
+          "plateau_start": {
+            "name": "Début du palier"
+          },
+          "plateau_end": {
+            "name": "Fin du palier"
           }
         }
       },
@@ -82,6 +101,12 @@
         "state_attributes": {
           "height": {
             "name": "Hauteur"
+          },
+          "plateau_start": {
+            "name": "Début du palier"
+          },
+          "plateau_end": {
+            "name": "Fin du palier"
           }
         }
       },
@@ -101,6 +126,45 @@
             "name": "Demain"
           }
         }
+      },
+      "sea_level": {
+        "name": "Niveau de la mer"
+      },
+      "lock_status": {
+        "name": "Écluse",
+        "state": {
+          "sas": "Sas",
+          "on_demand": "Sas à la demande",
+          "uncertain": "Sas incertain",
+          "no_sas": "Pas de sas",
+          "unknown": "Inconnu"
+        },
+        "state_attributes": {
+          "until": {
+            "name": "Jusqu'à"
+          },
+          "next_status": {
+            "name": "Statut suivant",
+            "state": {
+              "sas": "Sas",
+              "on_demand": "Sas à la demande",
+              "uncertain": "Sas incertain",
+              "no_sas": "Pas de sas",
+              "unknown": "Inconnu"
+            }
+          }
+        }
+      },
+      "next_lock_window": {
+        "name": "Prochaine ouverture de l'écluse",
+        "state_attributes": {
+          "end": {
+            "name": "Fin"
+          }
+        }
+      },
+      "lock_window_end": {
+        "name": "Fin de l'ouverture de l'écluse"
       }
     },
     "binary_sensor": {
@@ -111,6 +175,9 @@
             "name": "Seuil"
           }
         }
+      },
+      "lock_open": {
+        "name": "Écluse praticable"
       }
     }
   },
