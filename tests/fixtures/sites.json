@@ -1,0 +1,32 @@
+{
+ "sites": [
+  {
+   "site_id": "aber-wrac-h",
+   "site_name": "Aber Wrac'h",
+   "latitude": 48.611916,
+   "longitude": -4.58754,
+   "demo": false
+  },
+  {
+   "site_id": "brest",
+   "site_name": "Brest",
+   "latitude": 48.355071,
+   "longitude": -4.553849,
+   "demo": true
+  },
+  {
+   "site_id": "saint-malo",
+   "site_name": "Saint-Malo",
+   "latitude": 48.700799,
+   "longitude": -2.09327,
+   "demo": true
+  },
+  {
+   "site_id": "wissant",
+   "site_name": "Wissant",
+   "latitude": 50.894802,
+   "longitude": 1.661462,
+   "demo": false
+  }
+ ]
+}

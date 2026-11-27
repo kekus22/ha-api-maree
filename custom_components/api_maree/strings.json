@@ -1,0 +1,128 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "API Marée",
+        "description": "Enter your api-maree.fr API key to access all ports. Leave empty to use the public demo key (9 ports only). Create a free account at {register_url}.",
+        "data": {
+          "api_key": "API key (optional)"
+        },
+        "data_description": {
+          "api_key": "Available on your api-maree.fr account page."
+        }
+      },
+      "site": {
+        "title": "Choose a port",
+        "description": "{count} ports available ({mode}).",
+        "data": {
+          "site_id": "Port"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Update API key",
+        "description": "The API key was refused for {site}. Enter a new key, or leave empty to use the demo key.",
+        "data": {
+          "api_key": "API key"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid API key.",
+      "cannot_connect": "Unable to reach api-maree.fr.",
+      "no_sites": "The API returned no ports.",
+      "site_not_allowed": "This key does not give access to this port."
+    },
+    "abort": {
+      "already_configured": "This port is already configured.",
+      "no_more_sites": "All available ports are already configured.",
+      "reauth_successful": "API key updated."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "data": {
+          "spring_tide_threshold": "Spring tide threshold (coefficient)"
+        },
+        "data_description": {
+          "spring_tide_threshold": "The spring tide sensor turns on when the next high tide coefficient reaches this value."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "water_level": {
+        "name": "Water level"
+      },
+      "tide_state": {
+        "name": "Tide",
+        "state": {
+          "rising": "Rising",
+          "falling": "Falling"
+        }
+      },
+      "tide_level": {
+        "name": "Tide level"
+      },
+      "next_high_tide": {
+        "name": "Next high tide",
+        "state_attributes": {
+          "height": {
+            "name": "Height"
+          },
+          "coefficient": {
+            "name": "Coefficient"
+          }
+        }
+      },
+      "next_low_tide": {
+        "name": "Next low tide",
+        "state_attributes": {
+          "height": {
+            "name": "Height"
+          }
+        }
+      },
+      "next_high_tide_height": {
+        "name": "Next high tide height"
+      },
+      "next_low_tide_height": {
+        "name": "Next low tide height"
+      },
+      "coefficient": {
+        "name": "Tide coefficient",
+        "state_attributes": {
+          "today": {
+            "name": "Today"
+          },
+          "tomorrow": {
+            "name": "Tomorrow"
+          }
+        }
+      }
+    },
+    "binary_sensor": {
+      "spring_tide": {
+        "name": "Spring tide",
+        "state_attributes": {
+          "threshold": {
+            "name": "Threshold"
+          }
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "invalid_auth": {
+      "message": "API key refused by api-maree.fr."
+    },
+    "rate_limited": {
+      "message": "api-maree.fr hourly quota exceeded."
+    },
+    "update_failed": {
+      "message": "Error while fetching tide data: {error}"
+    }
+  }
+}

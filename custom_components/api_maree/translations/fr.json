@@ -1,0 +1,128 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "API Marée",
+        "description": "Saisissez votre clé api-maree.fr pour accéder à tous les ports. Laissez vide pour utiliser la clé de démonstration publique (9 ports seulement). Compte gratuit : {register_url}.",
+        "data": {
+          "api_key": "Clé API (facultative)"
+        },
+        "data_description": {
+          "api_key": "Disponible sur la page de votre compte api-maree.fr."
+        }
+      },
+      "site": {
+        "title": "Choix du port",
+        "description": "{count} ports disponibles ({mode}).",
+        "data": {
+          "site_id": "Port"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Mise à jour de la clé API",
+        "description": "La clé API a été refusée pour {site}. Saisissez une nouvelle clé, ou laissez vide pour la clé de démonstration.",
+        "data": {
+          "api_key": "Clé API"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Clé API invalide.",
+      "cannot_connect": "Impossible de joindre api-maree.fr.",
+      "no_sites": "L'API n'a renvoyé aucun port.",
+      "site_not_allowed": "Cette clé ne donne pas accès à ce port."
+    },
+    "abort": {
+      "already_configured": "Ce port est déjà configuré.",
+      "no_more_sites": "Tous les ports disponibles sont déjà configurés.",
+      "reauth_successful": "Clé API mise à jour."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "data": {
+          "spring_tide_threshold": "Seuil de vives eaux (coefficient)"
+        },
+        "data_description": {
+          "spring_tide_threshold": "Le capteur « Vives eaux » s'active quand le coefficient de la prochaine pleine mer atteint cette valeur."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "water_level": {
+        "name": "Hauteur d'eau"
+      },
+      "tide_state": {
+        "name": "Marée",
+        "state": {
+          "rising": "Montante",
+          "falling": "Descendante"
+        }
+      },
+      "tide_level": {
+        "name": "Niveau de marée"
+      },
+      "next_high_tide": {
+        "name": "Prochaine pleine mer",
+        "state_attributes": {
+          "height": {
+            "name": "Hauteur"
+          },
+          "coefficient": {
+            "name": "Coefficient"
+          }
+        }
+      },
+      "next_low_tide": {
+        "name": "Prochaine basse mer",
+        "state_attributes": {
+          "height": {
+            "name": "Hauteur"
+          }
+        }
+      },
+      "next_high_tide_height": {
+        "name": "Hauteur prochaine pleine mer"
+      },
+      "next_low_tide_height": {
+        "name": "Hauteur prochaine basse mer"
+      },
+      "coefficient": {
+        "name": "Coefficient de marée",
+        "state_attributes": {
+          "today": {
+            "name": "Aujourd'hui"
+          },
+          "tomorrow": {
+            "name": "Demain"
+          }
+        }
+      }
+    },
+    "binary_sensor": {
+      "spring_tide": {
+        "name": "Vives eaux",
+        "state_attributes": {
+          "threshold": {
+            "name": "Seuil"
+          }
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "invalid_auth": {
+      "message": "Clé API refusée par api-maree.fr."
+    },
+    "rate_limited": {
+      "message": "Quota horaire d'api-maree.fr dépassé."
+    },
+    "update_failed": {
+      "message": "Erreur lors de la récupération des marées : {error}"
+    }
+  }
+}
