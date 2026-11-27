@@ -43,7 +43,7 @@
       "cannot_connect": "Impossible de joindre api-maree.fr.",
       "no_sites": "L'API n'a renvoyé aucun port.",
       "site_not_allowed": "Cette clé ne donne pas accès à ce port.",
-      "edf_cannot_connect": "Impossible de lire les prévisions EDF. Le site d'EDF filtre parfois les accès automatisés : vérifiez que Home Assistant peut joindre www.edf.fr."
+      "edf_cannot_connect": "Impossible de lire les prévisions EDF. Le site d'EDF filtre parfois les accès automatisés : vérifiez que Home Assistant peut joindre le site d'EDF."
     },
     "abort": {
       "already_configured": "Ce port est déjà configuré.",
