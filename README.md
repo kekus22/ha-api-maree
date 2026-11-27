@@ -35,9 +35,8 @@ puis redémarrer.
 
 *Paramètres → Appareils et services → Ajouter une intégration → API Marée*
 
-1. Choisir la source : **Port (api-maree.fr)** ou **Estuaire de la Rance (EDF)**.
-2. Pour un port : saisir la clé API (ou laisser vide pour le mode démo), puis choisir le port.
-   Pour la Rance : simplement valider, aucune clé n'est nécessaire.
+1. Saisir la clé API, ou laisser vide pour le mode démo.
+2. Choisir le port.
 
 Répéter l'opération pour suivre plusieurs ports (la clé déjà saisie est proposée).
 Dans les **options** de l'intégration, on règle le seuil du capteur *Vives eaux* (70 par défaut).
@@ -57,7 +56,13 @@ Dans les **options** de l'intégration, on règle le seuil du capteur *Vives eau
 
 Les identifiants exacts dépendent de la langue de votre installation.
 
-### Estuaire de la Rance (source EDF)
+### Estuaire de la Rance (source EDF) — désactivée pour le moment
+
+> ⚠️ **Source masquée depuis la v0.2.1.** Le site d'EDF refuse (HTTP 403) les requêtes de Home
+> Assistant : il n'accepte que celles des navigateurs. Le choix « Estuaire de la Rance (EDF) » n'est
+> donc plus proposé à l'ajout de l'intégration. Le code est conservé
+> (`EDF_SOURCE_ENABLED` dans `const.py`) en attendant une solution autorisée par EDF ou une
+> source alimentée manuellement.
 
 En amont du barrage, le niveau de la Rance dépend du fonctionnement de l'usine marémotrice et non
 de la seule marée. EDF publie des prévisions sur 3 semaines au marégraphe de **Saint-Suliac**
