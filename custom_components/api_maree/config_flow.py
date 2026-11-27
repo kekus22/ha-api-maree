@@ -36,11 +36,15 @@ from .const import (
     CONF_LONGITUDE,
     CONF_SITE_ID,
     CONF_SITE_NAME,
+    CONF_SOURCE,
     CONF_SPRING_TIDE_THRESHOLD,
     DEFAULT_SPRING_TIDE_THRESHOLD,
     DEMO_API_KEY,
     DOMAIN,
+    SOURCE_API_MAREE,
+    SOURCE_EDF_RANCE,
 )
+from .edf import EDF_SITE_ID, EDF_SITE_NAME, EDF_TZ, PAGE_URL, EdfError, EdfRanceClient, monday_of
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -88,7 +92,48 @@ class ApiMareeConfigFlow(ConfigFlow, domain=DOMAIN):
         return ""
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """Étape 1 : clé API (laisser vide pour l'accès sans compte)."""
+        """Choix de la source de données."""
+        return self.async_show_menu(
+            step_id="user", menu_options=[SOURCE_API_MAREE, SOURCE_EDF_RANCE]
+        )
+
+    async def async_step_edf_rance(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Estuaire de la Rance (EDF) : aucune clé, un seul site."""
+        await self.async_set_unique_id(EDF_SITE_ID)
+        self._abort_if_unique_id_configured()
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            client = EdfRanceClient(async_get_clientsession(self.hass))
+            today = dt_util.now(EDF_TZ).date()
+            try:
+                await client.async_get_levels([monday_of(today)])
+            except EdfError:
+                _LOGGER.exception("Impossible de lire les prévisions EDF de la Rance")
+                errors["base"] = "edf_cannot_connect"
+            else:
+                return self.async_create_entry(
+                    title=EDF_SITE_NAME,
+                    data={
+                        CONF_SOURCE: SOURCE_EDF_RANCE,
+                        CONF_SITE_ID: EDF_SITE_ID,
+                        CONF_SITE_NAME: EDF_SITE_NAME,
+                        CONF_LATITUDE: 48.5806,
+                        CONF_LONGITUDE: -1.9811,
+                    },
+                )
+        return self.async_show_form(
+            step_id="edf_rance",
+            data_schema=vol.Schema({}),
+            errors=errors,
+            description_placeholders={"page_url": PAGE_URL},
+        )
+
+    async def async_step_api_maree(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """api-maree.fr, étape 1 : clé API (laisser vide pour l'accès sans compte)."""
         errors: dict[str, str] = {}
         if user_input is not None:
             self._api_key = _normalize_key(user_input.get(CONF_API_KEY))
@@ -108,7 +153,7 @@ class ApiMareeConfigFlow(ConfigFlow, domain=DOMAIN):
             }
         )
         return self.async_show_form(
-            step_id="user",
+            step_id="api_maree",
             data_schema=schema,
             errors=errors,
             description_placeholders={"register_url": REGISTER_URL},
@@ -130,6 +175,7 @@ class ApiMareeConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(
                 title=site.name,
                 data={
+                    CONF_SOURCE: SOURCE_API_MAREE,
                     CONF_API_KEY: self._api_key,
                     CONF_SITE_ID: site.site_id,
                     CONF_SITE_NAME: site.name,
@@ -201,6 +247,12 @@ class ApiMareeConfigFlow(ConfigFlow, domain=DOMAIN):
     def async_get_options_flow(config_entry: ConfigEntry) -> ApiMareeOptionsFlow:
         """Options."""
         return ApiMareeOptionsFlow()
+
+    @classmethod
+    @callback
+    def async_supports_options_flow(cls, config_entry: ConfigEntry) -> bool:
+        """Le seuil de vives eaux n'a de sens que pour api-maree.fr."""
+        return config_entry.data.get(CONF_SOURCE, SOURCE_API_MAREE) == SOURCE_API_MAREE
 
 
 class ApiMareeOptionsFlow(OptionsFlowWithReload):

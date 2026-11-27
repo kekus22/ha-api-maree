@@ -18,7 +18,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from .coordinator import ApiMareeConfigEntry, ApiMareeCoordinator
+from .const import SOURCE_API_MAREE, SOURCE_EDF_RANCE
+from .coordinator import ApiMareeConfigEntry, TideCoordinator
+from .edf import LOCK_PASSABLE, LOCK_STATUSES
 from .entity import ApiMareeEntity
 from .tide import HIGH, LOW, TideData
 
@@ -31,6 +33,7 @@ class ApiMareeSensorDescription(SensorEntityDescription):
 
     value_fn: Callable[[TideData, datetime], Any]
     attrs_fn: Callable[[TideData, datetime], dict[str, Any]] | None = None
+    sources: frozenset[str] = frozenset({SOURCE_API_MAREE, SOURCE_EDF_RANCE})
 
 
 def _round(value: float | None, digits: int) -> float | None:
@@ -45,6 +48,9 @@ def _next_attr(kind: str) -> Callable[[TideData, datetime], dict[str, Any]]:
         attrs: dict[str, Any] = {"height": round(ext.height, 2)}
         if ext.coefficient is not None:
             attrs["coefficient"] = ext.coefficient
+        if ext.start is not None and ext.end is not None:
+            attrs["plateau_start"] = ext.start.isoformat()
+            attrs["plateau_end"] = ext.end.isoformat()
         return attrs
 
     return _fn
@@ -92,13 +98,47 @@ def _coefficient_attrs(data: TideData, now: datetime) -> dict[str, Any]:
 
 
 def _height_attrs(data: TideData, now: datetime) -> dict[str, Any]:
-    attrs = data.card_attributes()
+    attrs = data.card_attributes(now)
     prev = data.previous_extremum(now)
     nxt = data.next_extremum(now)
     attrs["previous_tide"] = prev.as_dict() if prev else None
     attrs["next_tide"] = nxt.as_dict() if nxt else None
     return attrs
 
+
+def _lock_status(data: TideData, now: datetime) -> str | None:
+    period = data.lock_at(now)
+    return period.status if period else None
+
+
+def _lock_status_attrs(data: TideData, now: datetime) -> dict[str, Any]:
+    period = data.lock_at(now)
+    if period is None:
+        return {}
+    nxt = next((p for p in data.locks if p.start >= period.end), None)
+    return {
+        "until": period.end.isoformat(),
+        "next_status": nxt.status if nxt else None,
+    }
+
+
+def _next_lock_window(data: TideData, now: datetime) -> datetime | None:
+    window = next((w for w in data.lock_windows(LOCK_PASSABLE) if w[0] > now), None)
+    return window[0] if window else None
+
+
+def _next_lock_window_attrs(data: TideData, now: datetime) -> dict[str, Any]:
+    window = next((w for w in data.lock_windows(LOCK_PASSABLE) if w[0] > now), None)
+    return {"end": window[1].isoformat()} if window else {}
+
+
+def _lock_window_end(data: TideData, now: datetime) -> datetime | None:
+    window = next((w for w in data.lock_windows(LOCK_PASSABLE) if w[0] <= now < w[1]), None)
+    return window[1] if window else None
+
+
+_API = frozenset({SOURCE_API_MAREE})
+_EDF = frozenset({SOURCE_EDF_RANCE})
 
 SENSORS: tuple[ApiMareeSensorDescription, ...] = (
     ApiMareeSensorDescription(
@@ -156,6 +196,37 @@ SENSORS: tuple[ApiMareeSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=_coefficient,
         attrs_fn=_coefficient_attrs,
+        sources=_API,
+    ),
+    ApiMareeSensorDescription(
+        key="sea_level",
+        device_class=SensorDeviceClass.DISTANCE,
+        native_unit_of_measurement=UnitOfLength.METERS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        value_fn=lambda d, now: _round(d.sea_height_at(now), 2),
+        sources=_EDF,
+    ),
+    ApiMareeSensorDescription(
+        key="lock_status",
+        device_class=SensorDeviceClass.ENUM,
+        options=LOCK_STATUSES,
+        value_fn=_lock_status,
+        attrs_fn=_lock_status_attrs,
+        sources=_EDF,
+    ),
+    ApiMareeSensorDescription(
+        key="next_lock_window",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=_next_lock_window,
+        attrs_fn=_next_lock_window_attrs,
+        sources=_EDF,
+    ),
+    ApiMareeSensorDescription(
+        key="lock_window_end",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=_lock_window_end,
+        sources=_EDF,
     ),
 )
 
@@ -173,6 +244,9 @@ _UNRECORDED = frozenset(
         "next_tide",
         "site_id",
         "site_name",
+        "source",
+        "sea_curve",
+        "locks",
     }
 )
 
@@ -184,7 +258,9 @@ async def async_setup_entry(
 ) -> None:
     """Ajoute les capteurs d'un port."""
     coordinator = entry.runtime_data
-    async_add_entities(ApiMareeSensor(coordinator, desc) for desc in SENSORS)
+    async_add_entities(
+        ApiMareeSensor(coordinator, desc) for desc in SENSORS if coordinator.source in desc.sources
+    )
 
 
 class ApiMareeSensor(ApiMareeEntity, SensorEntity):
@@ -194,7 +270,7 @@ class ApiMareeSensor(ApiMareeEntity, SensorEntity):
     _unrecorded_attributes = _UNRECORDED
 
     def __init__(
-        self, coordinator: ApiMareeCoordinator, description: ApiMareeSensorDescription
+        self, coordinator: TideCoordinator, description: ApiMareeSensorDescription
     ) -> None:
         super().__init__(coordinator, description.key)
         self.entity_description = description

@@ -14,12 +14,21 @@ CONF_SITE_NAME: Final = "site_name"
 CONF_LATITUDE: Final = "latitude"
 CONF_LONGITUDE: Final = "longitude"
 CONF_SPRING_TIDE_THRESHOLD: Final = "spring_tide_threshold"
+CONF_SOURCE: Final = "source"
+
+SOURCE_API_MAREE: Final = "api_maree"
+SOURCE_EDF_RANCE: Final = "edf_rance"
 
 DEFAULT_SPRING_TIDE_THRESHOLD: Final = 70
 
 # Les marées sont prévisibles : un rafraîchissement toutes les 6 h suffit
 # largement (3 requêtes par rafraîchissement et par port).
 UPDATE_INTERVAL: Final = timedelta(hours=6)
+# Source EDF (Rance) : publiée chaque semaine, relue toutes les 6 h.
+EDF_UPDATE_INTERVAL: Final = timedelta(hours=6)
+EDF_WEEKS_AHEAD: Final = 3
+EDF_LOCK_DAYS: Final = 8
+
 # Recalcul local des valeurs (hauteur actuelle, prochaine marée…), sans appel API.
 RECOMPUTE_INTERVAL: Final = timedelta(minutes=1)
 

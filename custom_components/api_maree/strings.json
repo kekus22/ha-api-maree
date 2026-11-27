@@ -1,16 +1,6 @@
 {
   "config": {
     "step": {
-      "user": {
-        "title": "API Marée",
-        "description": "Enter your api-maree.fr API key to access all ports. Leave empty to use the public demo key (9 ports only). Create a free account at {register_url}.",
-        "data": {
-          "api_key": "API key (optional)"
-        },
-        "data_description": {
-          "api_key": "Available on your api-maree.fr account page."
-        }
-      },
       "site": {
         "title": "Choose a port",
         "description": "{count} ports available ({mode}).",
@@ -24,13 +14,36 @@
         "data": {
           "api_key": "API key"
         }
+      },
+      "user": {
+        "title": "API Marée",
+        "description": "Choose the data source.",
+        "menu_options": {
+          "api_maree": "Port (api-maree.fr)",
+          "edf_rance": "Rance estuary (EDF, Saint-Suliac)"
+        }
+      },
+      "edf_rance": {
+        "title": "Rance estuary (EDF)",
+        "description": "Forecast estuary and sea levels at the Saint-Suliac tide gauge and lock schedule of the dam, published by EDF ({page_url}). No key needed. Accuracy: ± 30 cm, excluding storm surge."
+      },
+      "api_maree": {
+        "title": "API Marée",
+        "description": "Enter your api-maree.fr API key to access all ports. Leave empty to use the public demo key (9 ports only). Create a free account at {register_url}.",
+        "data": {
+          "api_key": "API key (optional)"
+        },
+        "data_description": {
+          "api_key": "Available on your api-maree.fr account page."
+        }
       }
     },
     "error": {
       "invalid_auth": "Invalid API key.",
       "cannot_connect": "Unable to reach api-maree.fr.",
       "no_sites": "The API returned no ports.",
-      "site_not_allowed": "This key does not give access to this port."
+      "site_not_allowed": "This key does not give access to this port.",
+      "edf_cannot_connect": "Unable to read the EDF forecasts. The EDF website sometimes filters automated access: check that Home Assistant can reach www.edf.fr."
     },
     "abort": {
       "already_configured": "This port is already configured.",
@@ -74,6 +87,12 @@
           },
           "coefficient": {
             "name": "Coefficient"
+          },
+          "plateau_start": {
+            "name": "Plateau start"
+          },
+          "plateau_end": {
+            "name": "Plateau end"
           }
         }
       },
@@ -82,6 +101,12 @@
         "state_attributes": {
           "height": {
             "name": "Height"
+          },
+          "plateau_start": {
+            "name": "Plateau start"
+          },
+          "plateau_end": {
+            "name": "Plateau end"
           }
         }
       },
@@ -101,6 +126,45 @@
             "name": "Tomorrow"
           }
         }
+      },
+      "sea_level": {
+        "name": "Sea level"
+      },
+      "lock_status": {
+        "name": "Lock",
+        "state": {
+          "sas": "Lock open",
+          "on_demand": "On demand",
+          "uncertain": "Uncertain",
+          "no_sas": "Closed",
+          "unknown": "Unknown"
+        },
+        "state_attributes": {
+          "until": {
+            "name": "Until"
+          },
+          "next_status": {
+            "name": "Next status",
+            "state": {
+              "sas": "Lock open",
+              "on_demand": "On demand",
+              "uncertain": "Uncertain",
+              "no_sas": "Closed",
+              "unknown": "Unknown"
+            }
+          }
+        }
+      },
+      "next_lock_window": {
+        "name": "Next lock opening",
+        "state_attributes": {
+          "end": {
+            "name": "End"
+          }
+        }
+      },
+      "lock_window_end": {
+        "name": "Lock opening end"
       }
     },
     "binary_sensor": {
@@ -111,6 +175,9 @@
             "name": "Threshold"
           }
         }
+      },
+      "lock_open": {
+        "name": "Lock passable"
       }
     }
   },

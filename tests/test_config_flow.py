@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from homeassistant import config_entries
 from homeassistant.const import CONF_API_KEY
 from homeassistant.core import HomeAssistant
@@ -19,6 +20,17 @@ from custom_components.api_maree.const import (
 from .conftest import load_fixture
 
 
+async def _start_api_flow(hass: HomeAssistant):
+    """Ouvre le formulaire et choisit la source api-maree.fr dans le menu."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    assert result["type"] is FlowResultType.MENU
+    return await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "api_maree"}
+    )
+
+
 def _site_options(result) -> list[str]:
     selector = result["data_schema"].schema[CONF_SITE_ID]
     return [opt["value"] for opt in selector.config["options"]]
@@ -26,9 +38,7 @@ def _site_options(result) -> list[str]:
 
 async def test_demo_flow(hass: HomeAssistant, mock_api: AiohttpClientMocker) -> None:
     """Sans clé : seuls les ports de démo sont proposés."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await _start_api_flow(hass)
     assert result["type"] is FlowResultType.FORM
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["step_id"] == "site"
@@ -45,9 +55,7 @@ async def test_demo_flow(hass: HomeAssistant, mock_api: AiohttpClientMocker) -> 
 
 async def test_personal_key_flow(hass: HomeAssistant, mock_api: AiohttpClientMocker) -> None:
     """Avec une clé valide : tous les ports sont proposés."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await _start_api_flow(hass)
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_API_KEY: " abc123 "}
     )
@@ -68,9 +76,7 @@ async def test_invalid_key(hass: HomeAssistant, aioclient_mock: AiohttpClientMoc
     """Clé refusée : erreur affichée."""
     aioclient_mock.get(f"{BASE_URL}/sites", json=load_fixture("sites.json"))
     aioclient_mock.get(f"{BASE_URL}/tide-extrema", status=401, json={"error": "invalid_api_key"})
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await _start_api_flow(hass)
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_API_KEY: "bad"}
     )
@@ -81,9 +87,7 @@ async def test_invalid_key(hass: HomeAssistant, aioclient_mock: AiohttpClientMoc
 async def test_cannot_connect(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
     """Service indisponible."""
     aioclient_mock.get(f"{BASE_URL}/sites", status=500)
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await _start_api_flow(hass)
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["errors"] == {"base": "cannot_connect"}
 
@@ -93,9 +97,7 @@ async def test_configured_sites_are_hidden(
 ) -> None:
     """Un port déjà configuré n'est plus proposé."""
     config_entry.add_to_hass(hass)
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await _start_api_flow(hass)
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert _site_options(result) == ["saint-malo"]
 
@@ -128,3 +130,52 @@ async def test_options(
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert config_entry.options == {CONF_SPRING_TIDE_THRESHOLD: 95}
+
+
+@pytest.mark.freeze_time("2026-11-27T09:00:00+00:00")
+async def test_edf_flow(hass: HomeAssistant, mock_edf: AiohttpClientMocker) -> None:
+    """Source EDF : aucune saisie, une seule entrée possible."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "edf_rance"}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "edf_rance"
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["title"] == "Rance (Saint-Suliac)"
+    assert result["data"]["source"] == "edf_rance"
+    assert result["result"].unique_id == "edf_rance"
+
+    # Deuxième tentative : déjà configuré.
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "edf_rance"}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+
+
+@pytest.mark.freeze_time("2026-11-27T09:00:00+00:00")
+async def test_edf_flow_blocked(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
+    """EDF renvoie sa page « maintenance » (accès filtré) : erreur explicite."""
+    from custom_components.api_maree.edf import LEVELS_URL
+
+    aioclient_mock.get(
+        LEVELS_URL.format(monday="20261123"), status=403, text="<html>maintenance</html>"
+    )
+    for monday in ("20261116", "20261130"):
+        aioclient_mock.get(LEVELS_URL.format(monday=monday), status=403)
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "edf_rance"}
+    )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "edf_cannot_connect"}
