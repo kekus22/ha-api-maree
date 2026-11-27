@@ -19,6 +19,10 @@ CONF_SOURCE: Final = "source"
 SOURCE_API_MAREE: Final = "api_maree"
 SOURCE_EDF_RANCE: Final = "edf_rance"
 
+# Source EDF masquée : le site d'EDF refuse (HTTP 403) les requêtes de Home Assistant.
+# Le code est conservé ; passer à True pour la proposer de nouveau à l'ajout.
+EDF_SOURCE_ENABLED: Final = False
+
 DEFAULT_SPRING_TIDE_THRESHOLD: Final = 70
 
 # Les marées sont prévisibles : un rafraîchissement toutes les 6 h suffit

@@ -41,6 +41,7 @@ from .const import (
     DEFAULT_SPRING_TIDE_THRESHOLD,
     DEMO_API_KEY,
     DOMAIN,
+    EDF_SOURCE_ENABLED,
     SOURCE_API_MAREE,
     SOURCE_EDF_RANCE,
 )
@@ -92,7 +93,9 @@ class ApiMareeConfigFlow(ConfigFlow, domain=DOMAIN):
         return ""
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """Choix de la source de données."""
+        """Choix de la source de données (api-maree.fr seule tant qu'EDF est masquée)."""
+        if not EDF_SOURCE_ENABLED:
+            return await self.async_step_api_maree()
         return self.async_show_menu(
             step_id="user", menu_options=[SOURCE_API_MAREE, SOURCE_EDF_RANCE]
         )

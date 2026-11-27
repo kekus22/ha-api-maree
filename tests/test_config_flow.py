@@ -21,14 +21,28 @@ from .conftest import load_fixture
 
 
 async def _start_api_flow(hass: HomeAssistant):
-    """Ouvre le formulaire et choisit la source api-maree.fr dans le menu."""
+    """Ouvre le formulaire : directement api-maree.fr, la source EDF étant masquée."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "api_maree"
+    return result
+
+
+@pytest.fixture
+def edf_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Réactive la source EDF (masquée par défaut) pour tester son formulaire."""
+    monkeypatch.setattr("custom_components.api_maree.config_flow.EDF_SOURCE_ENABLED", True)
+
+
+async def test_menu_with_edf_enabled(hass: HomeAssistant, edf_enabled: None) -> None:
+    """Source EDF réactivée : le menu propose les deux sources."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     assert result["type"] is FlowResultType.MENU
-    return await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"next_step_id": "api_maree"}
-    )
+    assert result["menu_options"] == ["api_maree", "edf_rance"]
 
 
 def _site_options(result) -> list[str]:
@@ -133,7 +147,9 @@ async def test_options(
 
 
 @pytest.mark.freeze_time("2026-11-27T09:00:00+00:00")
-async def test_edf_flow(hass: HomeAssistant, mock_edf: AiohttpClientMocker) -> None:
+async def test_edf_flow(
+    hass: HomeAssistant, mock_edf: AiohttpClientMocker, edf_enabled: None
+) -> None:
     """Source EDF : aucune saisie, une seule entrée possible."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
@@ -161,7 +177,9 @@ async def test_edf_flow(hass: HomeAssistant, mock_edf: AiohttpClientMocker) -> N
 
 
 @pytest.mark.freeze_time("2026-11-27T09:00:00+00:00")
-async def test_edf_flow_blocked(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
+async def test_edf_flow_blocked(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, edf_enabled: None
+) -> None:
     """EDF renvoie sa page « maintenance » (accès filtré) : erreur explicite."""
     from custom_components.api_maree.edf import LEVELS_URL
 
